@@ -1,6 +1,7 @@
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from langfuse.decorators import observe
 
 from exchange import Message, ToolResult, ToolUse, Text
 from rich import print
@@ -19,6 +20,7 @@ from goose.profile import Profile
 from goose.utils import droid, load_plugins
 from goose.utils._cost_calculator import get_total_cost_message
 from goose.utils.session_file import read_or_create_file, save_latest_session
+from goose.utils.langfuse import setup_langfuse
 
 RESUME_MESSAGE = "I see we were interrupted. How can I help you?"
 
@@ -80,6 +82,7 @@ class Session:
         profile: Optional[str] = None,
         plan: Optional[dict] = None,
         log_level: Optional[str] = "INFO",
+        tracing: bool = False,
         **kwargs: Dict[str, Any],
     ) -> None:
         if name is None:
@@ -89,6 +92,8 @@ class Session:
         self.profile = profile
         self.status_indicator = Status("", spinner="dots")
         self.notifier = SessionNotifier(self.status_indicator)
+
+        setup_langfuse(use_langfuse=tracing)
 
         self.exchange = build_exchange(profile=load_profile(profile), notifier=self.notifier)
         setup_logging(log_file_directory=LOG_PATH, log_level=log_level)
@@ -174,6 +179,7 @@ class Session:
 
         self._log_cost()
 
+    @observe()
     def reply(self) -> None:
         """Reply to the last user message, calling tools as needed
 
