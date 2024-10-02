@@ -9,6 +9,7 @@ from exchange.providers.base import Provider, Usage
 from tenacity import retry, wait_fixed, stop_after_attempt
 from exchange.providers.utils import retry_if_status
 from exchange.providers.utils import raise_for_status
+from exchange.langfuse import observe_wrapper
 
 ANTHROPIC_HOST = "https://api.anthropic.com/v1/messages"
 
@@ -121,6 +122,7 @@ class AnthropicProvider(Provider):
             messages_spec.append(converted)
         return messages_spec
 
+    @observe_wrapper(as_type="generation")
     def complete(
         self,
         model: str,
