@@ -58,9 +58,33 @@ def toolkit() -> None:
 @toolkit.command(name="list")
 def list_toolkits() -> None:
     print("[green]Available toolkits:[/green]")
+    plugins = load_plugins("goose.toolkit")
+    print(plugins)
     for toolkit_name, toolkit in load_plugins("goose.toolkit").items():
         first_line_of_doc = toolkit.__doc__.split("\n")[0]
         print(f" - [bold]{toolkit_name}[/bold]: {first_line_of_doc}")
+
+
+@goose_cli.group()
+def providers() -> None:
+    """Manage providers"""
+    pass
+
+@providers.command(name="list")
+def list_providers() -> None:
+    providers = load_plugins(group="exchange.provider")
+    print(providers)
+    for provider_name, provider in providers.items():
+        #print(provider_name, provider)
+        doc = provider.__doc__
+        if doc:
+            #print(provider.__doc__)
+            first_line_of_doc = provider.__doc__.split("\n")[0]
+            print(f" - [bold]{provider_name}[/bold]: {first_line_of_doc}")
+        else:
+            pass
+            #print("DANGER !!!!! ", provider_name)
+
 
 
 @session.command(name="start")
