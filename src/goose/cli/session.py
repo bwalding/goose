@@ -1,6 +1,7 @@
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from langfuse.decorators import langfuse_context
 
 from exchange import Message, ToolResult, ToolUse, Text
 from exchange.langfuse import observe_wrapper
@@ -20,7 +21,6 @@ from goose.profile import Profile
 from goose.utils import droid, load_plugins
 from goose.utils._cost_calculator import get_total_cost_message
 from goose.utils.session_file import read_or_create_file, save_latest_session
-from goose.utils.langfuse import setup_langfuse
 
 RESUME_MESSAGE = "I see we were interrupted. How can I help you?"
 
@@ -93,7 +93,7 @@ class Session:
         self.status_indicator = Status("", spinner="dots")
         self.notifier = SessionNotifier(self.status_indicator)
 
-        setup_langfuse(use_langfuse=tracing)
+        langfuse_context.configure(enabled=tracing)
 
         self.exchange = build_exchange(profile=load_profile(profile), notifier=self.notifier)
         setup_logging(log_file_directory=LOG_PATH, log_level=log_level)
