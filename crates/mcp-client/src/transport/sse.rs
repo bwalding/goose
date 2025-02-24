@@ -30,6 +30,7 @@ pub struct SseActor {
     http_client: HttpClient,
     /// The discovered endpoint for POST requests (once "endpoint" SSE event arrives)
     post_endpoint: Arc<RwLock<Option<String>>>,
+    authorization_header: String,
 }
 
 impl SseActor {
@@ -38,6 +39,7 @@ impl SseActor {
         pending_requests: Arc<PendingRequests>,
         sse_url: String,
         post_endpoint: Arc<RwLock<Option<String>>>,
+        authorization_header: String,
     ) -> Self {
         Self {
             receiver,
@@ -45,6 +47,7 @@ impl SseActor {
             sse_url,
             post_endpoint,
             http_client: HttpClient::new(),
+            authorization_header: authorization_header,
         }
     }
 
@@ -56,13 +59,15 @@ impl SseActor {
             Self::handle_incoming_messages(
                 self.sse_url.clone(),
                 Arc::clone(&self.pending_requests),
-                Arc::clone(&self.post_endpoint)
+                Arc::clone(&self.post_endpoint),
+                self.authorization_header.clone(),
             ),
             Self::handle_outgoing_messages(
                 self.receiver,
                 self.http_client.clone(),
                 Arc::clone(&self.post_endpoint),
                 Arc::clone(&self.pending_requests),
+                self.authorization_header.clone(),
             )
         );
     }
@@ -75,9 +80,20 @@ impl SseActor {
         sse_url: String,
         pending_requests: Arc<PendingRequests>,
         post_endpoint: Arc<RwLock<Option<String>>>,
+        authorization_header: String,
     ) {
         let client = match eventsource_client::ClientBuilder::for_url(&sse_url) {
-            Ok(builder) => builder.build(),
+            Ok(mut builder) => {
+                builder = match builder.header("Authorization", authorization_header.as_ref()) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        pending_requests.clear().await;
+                        warn!("Failed to set header: {}", e);
+                        return;
+                    }
+                };
+                builder.build()
+            }
             Err(e) => {
                 pending_requests.clear().await;
                 warn!("Failed to connect SSE client: {}", e);
@@ -141,6 +157,7 @@ impl SseActor {
         http_client: HttpClient,
         post_endpoint: Arc<RwLock<Option<String>>>,
         pending_requests: Arc<PendingRequests>,
+        authorization_header: String,
     ) {
         while let Some(transport_msg) = receiver.recv().await {
             let post_url = match post_endpoint.read().await.as_ref() {
@@ -177,6 +194,7 @@ impl SseActor {
             match http_client
                 .post(&post_url)
                 .header("Content-Type", "application/json")
+                .header("Authorization", authorization_header.to_string())
                 .body(message_str)
                 .send()
                 .await
@@ -274,6 +292,7 @@ impl Transport for SseTransport {
             Arc::new(PendingRequests::new()),
             self.sse_url.clone(),
             post_endpoint,
+            self.env.get("authorization").unwrap().to_string(),
         );
 
         // Spawn the actor task
