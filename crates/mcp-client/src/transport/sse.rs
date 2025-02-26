@@ -250,23 +250,18 @@ impl SseTransport {
         }
     }
 
-    /// Waits for the endpoint to be set, up to 10 attempts.
+    /// Waits for the endpoint to be set, caller is responsible for timeout
     async fn wait_for_endpoint(
         post_endpoint: Arc<RwLock<Option<String>>>,
     ) -> Result<String, Error> {
         // Check every 100ms for the endpoint, for up to 10 attempts
         let check_interval = Duration::from_millis(100);
-        let mut attempts = 0;
-        let max_attempts = 10;
-
-        while attempts < max_attempts {
+        loop {
             if let Some(url) = post_endpoint.read().await.clone() {
                 return Ok(url);
             }
             tokio::time::sleep(check_interval).await;
-            attempts += 1;
         }
-        Err(Error::SseConnection("No endpoint discovered".to_string()))
     }
 }
 
